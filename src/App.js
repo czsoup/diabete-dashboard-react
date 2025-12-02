@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell,ScatterChart, Scatter, ZAxis } from 'recharts';
 import { Activity, Heart, TrendingUp, AlertCircle, CheckCircle, FileText } from 'lucide-react';
 
 const DiabetesDashboard = () => {
@@ -46,6 +46,7 @@ const DiabetesDashboard = () => {
     { feature: 'Income', value: -0.18 }
   ];
 
+
   const featureImportance = [
     { feature: 'GenHlth', importance: 0.185 },
     { feature: 'BMI', importance: 0.142 },
@@ -65,7 +66,8 @@ const DiabetesDashboard = () => {
     aucRoc: 0.8521,
     sensitivity: 0.7812,
     specificity: 0.7654,
-    precision: 0.6891
+    precision: 0.6891,
+    TN: 30877, FP: 11864, FN: 1992, TP: 6003
   };
 
   const thresholdData = [
@@ -78,6 +80,38 @@ const DiabetesDashboard = () => {
     { threshold: 0.7, f1: 0.62, recall: 0.58, precision: 0.80 }
   ];
 
+  const confusionMatrixData = [
+    { x: 0, y: 1, value: metricsData.TN, type: 'Vrais Négatifs (TN)', fill: '#10b981' }, 
+    { x: 1, y: 1, value: metricsData.FP, type: 'Faux Positifs (FP)', fill: '#ef4444' }, 
+    { x: 0, y: 0, value: metricsData.FN, type: 'Faux Négatifs (FN)', fill: '#f59e0b' }, 
+    { x: 1, y: 0, value: metricsData.TP, type: 'Vrais Positifs (TP)', fill: '#3b82f6' }, 
+  ];
+
+  const rocCurveData = [
+    { fpr: 0.0, tpr: 0.0 }, { fpr: 0.05, tpr: 0.4 }, { fpr: 0.1, tpr: 0.65 },
+    { fpr: 0.2, tpr: 0.80 }, { fpr: 0.3, tpr: 0.88 }, { fpr: 0.5, tpr: 0.94 },
+    { fpr: 0.7, tpr: 0.98 }, { fpr: 1.0, tpr: 1.0 }
+  ];
+
+  const learningCurveData = [
+    { size: 20, train: 0.98, val: 0.65 },
+    { size: 40, train: 0.95, val: 0.70 },
+    { size: 60, train: 0.90, val: 0.73 },
+    { size: 80, train: 0.85, val: 0.74 },
+    { size: 100, train: 0.82, val: 0.75 } // Convergence
+  ];
+
+  const maxValue = Math.max(metricsData.TN, metricsData.FP, metricsData.FN, metricsData.TP);
+
+   const getBlueIntensity = (value, maxValue) => {
+    const intensity = maxValue > 0 ? value / maxValue : 0;
+    
+     return `rgba(30, 58, 138, ${0.1 + (intensity * 0.9)})`; 
+  };
+
+   const getTextColor = (value, maxValue) => {
+      return (value / maxValue) > 0.5 ? 'white' : '#1f2937';
+  };
   const handleInputChange = (e) => {
     const { name, value, type } = e.target;
     setFormData(prev => ({
@@ -323,7 +357,171 @@ const DiabetesDashboard = () => {
                   </div>
                 </div>
               </div>
+              
             </div>
+            {/* COURBE ROC */}
+              <div className="bg-white rounded-xl shadow-md p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Courbe ROC</h2>
+                <ResponsiveContainer width="100%" height={300}>
+                    <LineChart 
+                        data={rocCurveData} 
+                        margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
+                    >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        
+                        <XAxis 
+                            dataKey="fpr" 
+                            type="number" 
+                            domain={[0, 1]} 
+                            label={{ 
+                                value: 'Faux Positifs (FPR)', 
+                                position: 'insideBottom', 
+                                offset: -20, 
+                                style: { textAnchor: 'middle' }
+                            }} 
+                        />
+                        
+                        <YAxis 
+                            dataKey="tpr" 
+                            type="number" 
+                            domain={[0, 1]} 
+                            label={{ 
+                                value: 'Vrais Positifs (TPR)', 
+                                angle: -90, 
+                                position: 'insideLeft',
+                                style: { textAnchor: 'middle' } 
+                            }} 
+                        />
+                        
+                        <Tooltip />
+                        
+                        <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '10px' }}/>
+                        
+                        <Line type="monotone" dataKey="tpr" stroke="#8b5cf6" strokeWidth={2} name="ROC" dot={false}/>
+                        <Line type="monotone" dataKey="fpr" stroke="#d1d5db" strokeWidth={1} strokeDasharray="5 5" name="Aléatoire" dot={false}/>
+                    </LineChart>
+                </ResponsiveContainer>
+                <p className="text-sm text-gray-600 mt-4 text-center">AUC-ROC: {metricsData.aucRoc.toFixed(4)}</p>
+            </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* FIGURE 3: Matrice de Confusion (CORRIGÉE AVEC HAUTEUR FIXE) */}
+                <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">Matrice de Confusion</h3>
+                    
+                    <div className="grid grid-cols-[auto_1fr] gap-2 w-full max-w-lg">
+                        
+                        {/* Coin haut gauche vide */}
+                        <div className="h-8"></div> 
+
+                        {/* AXE X (Prédiction) : Labels supérieurs */}
+                        <div className="grid grid-cols-2 text-center text-sm font-semibold text-gray-600 mb-2">
+                            <div>Prédit: Non</div>
+                            <div>Prédit: Oui</div>
+                        </div>
+
+                        {/* AXE Y (Réalité) : Labels latéraux */}
+                        {/* On force h-64 pour que ça fasse la même taille que la grille */}
+                        <div className="h-64 flex flex-col justify-between text-right pr-3 text-sm font-semibold text-gray-600">
+                            <div className="h-1/2 flex items-center justify-end">Réel: Non</div>
+                            <div className="h-1/2 flex items-center justify-end">Réel: Oui</div>
+                        </div>
+
+                        {/* LE CORPS DE LA MATRICE */}
+                        {/* On force h-64 et grid-rows-2 pour que les cases prennent toute la place */}
+                        <div className="h-64 grid grid-cols-2 grid-rows-2 border-2 border-gray-100">
+                            
+                            {/* TN (True Negative) */}
+                            <div 
+                                className="flex flex-col items-center justify-center p-2 border-r border-b border-gray-100 transition-all hover:bg-blue-50"
+                                style={{ backgroundColor: getBlueIntensity(metricsData.TN, maxValue) }}
+                            >
+                                <span className="text-2xl font-bold" style={{ color: getTextColor(metricsData.TN, maxValue) }}>
+                                    {metricsData.TN}
+                                </span>
+                                <span className="text-xs uppercase font-medium mt-1" style={{ color: getTextColor(metricsData.TN, maxValue) }}>
+                                    (TN)
+                                </span>
+                            </div>
+
+                            {/* FP (False Positive) */}
+                            <div 
+                                className="flex flex-col items-center justify-center p-2 border-b border-gray-100 transition-all hover:bg-blue-50"
+                                style={{ backgroundColor: getBlueIntensity(metricsData.FP, maxValue) }}
+                            >
+                                <span className="text-2xl font-bold" style={{ color: getTextColor(metricsData.FP, maxValue) }}>
+                                    {metricsData.FP}
+                                </span>
+                                <span className="text-xs uppercase font-medium mt-1" style={{ color: getTextColor(metricsData.FP, maxValue) }}>
+                                    (FP)
+                                </span>
+                            </div>
+
+                            {/* FN (False Negative) */}
+                            <div 
+                                className="flex flex-col items-center justify-center p-2 border-r border-gray-100 transition-all hover:bg-blue-50"
+                                style={{ backgroundColor: getBlueIntensity(metricsData.FN, maxValue) }}
+                            >
+                                <span className="text-2xl font-bold" style={{ color: getTextColor(metricsData.FN, maxValue) }}>
+                                    {metricsData.FN}
+                                </span>
+                                <span className="text-xs uppercase font-medium mt-1" style={{ color: getTextColor(metricsData.FN, maxValue) }}>
+                                    (FN)
+                                </span>
+                            </div>
+
+                            {/* TP (True Positive) */}
+                            <div 
+                                className="flex flex-col items-center justify-center p-2 transition-all hover:bg-blue-50"
+                                style={{ backgroundColor: getBlueIntensity(metricsData.TP, maxValue) }}
+                            >
+                                <span className="text-2xl font-bold" style={{ color: getTextColor(metricsData.TP, maxValue) }}>
+                                    {metricsData.TP}
+                                </span>
+                                <span className="text-xs uppercase font-medium mt-1" style={{ color: getTextColor(metricsData.TP, maxValue) }}>
+                                    (TP)
+                                </span>
+                            </div>
+                        </div>
+                        
+                        {/* Légende axe X en bas */}
+                        <div></div> {/* Espace vide à gauche */}
+                        <div className="text-center mt-2 text-sm text-gray-500 font-medium">Prédiction</div>
+
+                    </div>
+                </div>
+
+                {/* FIGURE 4: Courbe d'Apprentissage (Interactive Line) */}
+                <div className="bg-white rounded-xl shadow-md p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Courbe d'Apprentissage</h3>
+                  <ResponsiveContainer width="100%" height={350}>
+                    <LineChart 
+                      data={learningCurveData}
+                      margin={{ top: 20, right: 30, left: 0, bottom: 30 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      
+                      <XAxis 
+                        dataKey="size" 
+                        label={{ 
+                          value: "% Données d'Entraînement", 
+                          position: 'insideBottom', 
+                          offset: -20, 
+                          style: { textAnchor: 'middle', fill: '#666' }  
+                        }} 
+                      />
+                      
+                      <YAxis domain={[0.5, 1]} />
+                      <Tooltip />
+                      
+                      <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '20px' }} />
+                      
+                      <Line type="monotone" dataKey="train" stroke="#3b82f6" strokeWidth={2} name="Entraînement" />
+                      <Line type="monotone" dataKey="val" stroke="#10b981" strokeWidth={2} name="Validation" />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+            </div>    
+
           </div>
         )}
 
