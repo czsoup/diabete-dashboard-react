@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.js": "/diabete-dashboard-react/static/js/main.31b585cf.js",
+    "main.js": "/diabete-dashboard-react/static/js/main.ad4e4de6.js",
     "index.html": "/diabete-dashboard-react/index.html",
-    "main.31b585cf.js.map": "/diabete-dashboard-react/static/js/main.31b585cf.js.map"
+    "main.ad4e4de6.js.map": "/diabete-dashboard-react/static/js/main.ad4e4de6.js.map"
   },
   "entrypoints": [
-    "static/js/main.31b585cf.js"
+    "static/js/main.ad4e4de6.js"
   ]
 }
